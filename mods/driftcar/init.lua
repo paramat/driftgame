@@ -1,16 +1,16 @@
 -- Parameters
 
-local MAXGRIP = 7 -- Maximum linear and lateral acceleration, in nodes/s^2
-				-- Halved on 'crumbly' nodes.
+local GRIP = 8 -- On road maximum linear and lateral acceleration, in nodes/s^2
+local ORGRIP = 5 -- Off road maximum linear and lateral acceleration, in nodes/s^2
 local SZTORQ = 22 -- Car speed where motor torque drops to zero, in nodes/s
 local DRAG = 0.04 -- Air drag
-local ROLRES = 0.6 -- Rolling resistence TODO increase in crumbly
+local ROLRES = 0.6 -- Rolling resistence, in nodes/s^2
+local ORROLRES = 1.8 -- Off road Rolling resistence, in nodes/s^2
 local GRAV = 9.81 -- Acceleration of gravity, in nodes/s^2
--- Turn parameters, in radians/s or radians/s^2
-local TINIT = 0.36 -- Initial turn speed on first control input
-local TACC = 0.12 -- Turn acceleration on control input
-local TMAX = 1.6 -- Maximum turn speed (Smart fortwo turning circle 7 nodes)
-local TDEC = 0.24 -- Turn deceleration on no control input
+local TINIT = 0.36 -- Initial turn speed on first control input, in radians/s
+local TACC = 0.12 -- Turn acceleration on control input, in radians/s^2
+local TMAX = 1.6 -- Maximum turn speed, in radians/s
+local TDEC = 0.24 -- Turn deceleration on no control input, in radians/s^2
 
 -- End of parameters
 
@@ -220,10 +220,13 @@ function car.on_step(self, dtime)
 	local node_under = minetest.get_node(under_pos)
 	local nodedef_under = minetest.registered_nodes[node_under.name]
 	local touch = nodedef_under.walkable
+	-- On road bool
+	local onroad = true
 	-- Modify grip according to 'crumbly' group
-	local grip = MAXGRIP
+	local grip = GRIP
 	if nodedef_under.groups.crumbly then
-		grip = MAXGRIP / 2
+		grip = ORGRIP
+		onroad = false
 	end
 
 	-- Torque acceleration applied linear to car
@@ -306,9 +309,17 @@ function car.on_step(self, dtime)
 	local rraccmag = 0
 	if touch then
 		if linvel > 0 then
-			rraccmag = -ROLRES
+			if onroad then
+				rraccmag = -ROLRES
+			else
+				rraccmag = -ORROLRES
+			end
 		elseif linvel < 0 then
-			rraccmag = ROLRES
+			if onroad then
+				rraccmag = ROLRES
+			else
+				rraccmag = ORROLRES
+			end
 		end
 	end
 	--local rracc = get_veccomp(rraccmag, self.object:getyaw(), 0)
@@ -328,7 +339,7 @@ function car.on_step(self, dtime)
 		tlfacc = get_veccomp(tlfaccmag, self.object:getyaw() + math.pi / 2, 0)
 
 		-- Tire smoke
-		if self.driver and math.random() < -0.05 + math.abs(latvel) / 30 then
+		if self.driver and onroad and math.random() < -0.05 + math.abs(latvel) / 30 then
 			local opos = self.object:getpos()
 			opos.y = opos.y - 0.5
 			local yaw = self.object:getyaw()
