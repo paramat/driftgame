@@ -1,4 +1,4 @@
-driftgame 0.1.1 by paramat
+driftgame 0.1.2 by paramat
 A game for Minetest Engine 5.2.0 and later
 Built on the 'minipeli' game by paramat
 
@@ -12,7 +12,6 @@ Using this game
 ---------------
 Due to client->server->client control delay it is recommended that this game is used in singleplayer or in local multiplayer.
 Generation of new areas of world may slightly affect the control response of the vehicle, the best control response will occur in previously generated areas.
-Left arrow and right arrow blocks are given to a new player to mark out a race track.
 Third-person camera mode is recommended when driving for a better view.
 
 How to start playing this game

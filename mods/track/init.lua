@@ -3,20 +3,29 @@
 local pathy = 8
 
 local np_patha = {
-	offset = 0,
+	offset = -0.2,
 	scale = 1,
-	spread = {x = 256, y = 256, z = 256},
+	spread = {x = 384, y = 384, z = 384},
 	seed = 11711,
-	octaves = 3,
-	persist = 0.5
+	octaves = 4,
+	persist = 0.6
 }
 
 local np_pathb = {
-	offset = 0,
+	offset = -0.2,
 	scale = 1,
-	spread = {x = 256, y = 256, z = 256},
+	spread = {x = 384, y = 384, z = 384},
 	seed = 303,
-	octaves = 3,
+	octaves = 1,
+	persist = 0.5
+}
+
+local np_blend = {
+	offset = 0.0,
+	scale = 6.0,
+	spread = {x = 192, y = 192, z = 192},
+	seed = 95059,
+	octaves = 1,
 	persist = 0.5
 }
 
@@ -42,7 +51,7 @@ minetest.register_node("track:road_white", {
 minetest.register_node("track:arrow_left", {
 	description = "Arrow Block Left",
 	tiles = {"track_red.png", "track_red.png",
-		"track_red.png", "track_red.png",
+		"track_arrow_left.png", "track_red.png",
 		"track_red.png", "track_arrow_left.png"},
 	paramtype = "light",
 	light_source = 14,
@@ -53,7 +62,7 @@ minetest.register_node("track:arrow_left", {
 minetest.register_node("track:arrow_right", {
 	description = "Arrow Block Right",
 	tiles = {"track_red.png", "track_red.png",
-		"track_red.png", "track_red.png",
+		"track_arrow_left.png^[transformFX", "track_red.png",
 		"track_red.png", "track_arrow_left.png^[transformFX"},
 	paramtype = "light",
 	light_source = 14,
@@ -81,8 +90,10 @@ local c_roadwhite = minetest.get_content_id("track:road_white")
 
 local nobj_patha = nil
 local nobj_pathb = nil
+local nobj_blend = nil
 local nvals_patha = {}
 local nvals_pathb = {}
+local nvals_blend = {}
 local data = {}
 
 
@@ -112,8 +123,10 @@ minetest.register_on_generated(function(minp, maxp, seed)
 
 	nobj_patha = nobj_patha or minetest.get_perlin_map(np_patha, pmapdims)
 	nobj_pathb = nobj_pathb or minetest.get_perlin_map(np_pathb, pmapdims)
+	nobj_blend = nobj_blend or minetest.get_perlin_map(np_blend, pmapdims)
 	nobj_patha:get2dMap_flat(pmapminp, nvals_patha)
 	nobj_pathb:get2dMap_flat(pmapminp, nvals_pathb)
+	nobj_blend:get2dMap_flat(pmapminp, nvals_blend)
 
 	local vm, emin, emax = minetest.get_mapgen_object("voxelmanip")
 	local area = VoxelArea:new{MinEdge = emin, MaxEdge = emax}
@@ -123,26 +136,39 @@ minetest.register_on_generated(function(minp, maxp, seed)
 	for z = z0 - 4, z1 + 4 do
 		-- Initial noise index at x0 - 4 for this z
 		local ni = 1 + (z - (z0 - 5)) * pmapdim + 1
-		local n_xprepatha = nvals_patha[(ni - 1)]
-		local n_xprepathb = nvals_pathb[(ni - 1)]
+		local xpreblend = (math.tanh(nvals_blend[(ni - 1)]) + 1) / 2
+		local n_xprepath = (1 - xpreblend) * nvals_patha[(ni - 1)] +
+			xpreblend * nvals_pathb[(ni - 1)]
+		--local n_xprepatha = nvals_patha[(ni - 1)]
+		--local n_xprepathb = nvals_pathb[(ni - 1)]
 		for x = x0 - 4, x1 + 4 do
-			local n_patha = nvals_patha[ni]
-			local n_pathb = nvals_pathb[ni]
-			local n_zprepatha = nvals_patha[(ni - pmapdim)]
-			local n_zprepathb = nvals_pathb[(ni - pmapdim)]
+			local blend = (math.tanh(nvals_blend[ni]) + 1) / 2
+			local n_path = (1 - blend) * nvals_patha[ni] + blend * nvals_pathb[ni]
+			--local n_patha = nvals_patha[ni]
+			--local n_pathb = nvals_pathb[ni]
+			local zpreblend = (math.tanh(nvals_blend[(ni - pmapdim)]) + 1) / 2
+			local n_zprepath = (1 - zpreblend) * nvals_patha[(ni - pmapdim)] +
+				zpreblend * nvals_pathb[(ni - pmapdim)]
+			--local n_zprepatha = nvals_patha[(ni - pmapdim)]
+			--local n_zprepathb = nvals_pathb[(ni - pmapdim)]
 			-- Detect sign change of noise
-			if (n_patha >= 0 and n_xprepatha < 0)
-					or (n_patha < 0 and n_xprepatha >= 0)
-					or (n_patha >= 0 and n_zprepatha < 0)
-					or (n_patha < 0 and n_zprepatha >= 0)
+			if (n_path >= 0 and n_xprepath < 0)
+					or (n_path < 0 and n_xprepath >= 0)
+					or (n_path >= 0 and n_zprepath < 0)
+					or (n_path < 0 and n_zprepath >= 0) then
 
-					or (n_pathb >= 0 and n_xprepathb < 0)
-					or (n_pathb < 0 and n_xprepathb >= 0)
-					or (n_pathb >= 0 and n_zprepathb < 0)
-					or (n_pathb < 0 and n_zprepathb >= 0)-- then
+					--(n_patha >= 0 and n_xprepatha < 0)
+					--or (n_patha < 0 and n_xprepatha >= 0)
+					--or (n_patha >= 0 and n_zprepatha < 0)
+					--or (n_patha < 0 and n_zprepatha >= 0)
+
+					--or (n_pathb >= 0 and n_xprepathb < 0)
+					--or (n_pathb < 0 and n_xprepathb >= 0)
+					--or (n_pathb >= 0 and n_zprepathb < 0)
+					--or (n_pathb < 0 and n_zprepathb >= 0)
 					-- Smooth corners of junctions
-					or math.pow(math.abs(n_patha), 0.1) *
-					math.pow(math.abs(n_pathb), 0.1) < 0.5 then
+					--or math.pow(math.abs(n_patha), 0.1) *
+					--math.pow(math.abs(n_pathb), 0.1) < 0.5 then
 				-- Place track brush of radius 4
 				for k = -4, 4 do
 					local vi = area:index(x - 4, pathy, z + k)
@@ -162,8 +188,9 @@ minetest.register_on_generated(function(minp, maxp, seed)
 			end
 
 			ni = ni + 1
-			n_xprepatha = n_patha
-			n_xprepathb = n_pathb
+			n_xprepath = n_path
+			--n_xprepatha = n_patha
+			--n_xprepathb = n_pathb
 		end
 	end
 	

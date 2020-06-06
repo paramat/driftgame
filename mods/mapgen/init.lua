@@ -206,7 +206,7 @@ minetest.register_biome({
 	node_top = "mapgen:grass",
 	depth_top = 1,
 	node_filler = "mapgen:dirt",
-	depth_filler = 1,
+	depth_filler = 2,
 	node_riverbed = "mapgen:sand",
 	depth_riverbed = 2,
 	node_cave_liquid = "mapgen:water_source",
