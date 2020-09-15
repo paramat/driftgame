@@ -34,6 +34,7 @@ minetest.register_decoration({
 		octaves = 3,
 		persist = 0.7
 	},
+	biomes = {"grassland"},
 	y_min = -31000,
 	y_max = 31000,
 	schematic = minetest.get_modpath("trees").."/schematics/trees_pine_tree.mts",

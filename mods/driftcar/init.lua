@@ -98,13 +98,13 @@ end
 
 local car = {
 	initial_properties = {
+		visual = "wielditem",
+		wield_item = "driftcar:blue_nodebox",
+		visual_size = {x = 1.667, y = 1.667}, -- Scale-up of nodebox is these * 1.5
+		collisionbox = {-0.53, -0.75, -0.53, 0.53, 0.75, 0.53},
+		stepheight = 0.6,
 		physical = true,
 		collide_with_objects = false,
-		collisionbox = {-0.53, -0.75, -0.53, 0.53, 0.75, 0.53},
-		visual = "wielditem",
-		visual_size = {x = 1.667, y = 1.667}, -- Scale-up of nodebox is these * 1.5
-		textures = {"driftcar:blue_nodebox"},
-		stepheight = 0.6,
 	},
 
 	-- Custom fields
@@ -446,13 +446,19 @@ minetest.register_on_newplayer(function(player)
 end)
 
 
--- Nodeboxes
+-- Nodebox
 
--- Smart Fortwo dim: L 2.695 W 1.663 H 1.555
--- Size in pixels L 21.56 W 13.304 H 12.44
--- Alter to L 20 W 12 H 12
--- 20 = full cube of unscaled nodebox, 1 pixel = 0.05
--- Required nodebox scale up 2.5, visual_size = 2.5 / 1.5 = 1.667
+-- If a nodebox exceeds {-0.5, -0.5, -0.5, 0.5, 0.5, 0.5}, the textures repeat and tile,
+-- so the nodebox is defined within that volume and scaled-up using 'visual_size'.
+
+-- Smart Fortwo dimensions: L 2.695 W 1.663 H 1.555.
+-- Size in world pixels (with 8px textures) L 21.56 W 13.304 H 12.44.
+-- Alter to L 20 W 12 H 12 (2.5 nodes long).
+-- 20 = full cube of unscaled nodebox, 1 pixel = 0.05.
+
+-- Required nodebox scale-up 2.5.
+-- 'wielditem'-visual entity 'visual_size' = 2.5 / 1.5 = 1.667, because a
+-- 'wielditem'-visual entity is automatically scaled up by 1.5.
 
 minetest.register_node("driftcar:blue_nodebox", {
 	description = "Drift Car Blue Nodebox",

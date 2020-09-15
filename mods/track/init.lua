@@ -2,21 +2,54 @@
 
 local pathy = 8
 
+-- Noises blended to create 'path'
+
 local np_patha = {
-	offset = 0,
+	offset = 0.0,
 	scale = 1,
-	spread = {x = 256, y = 256, z = 256},
+	spread = {x = 384, y = 384, z = 384},
 	seed = 11711,
-	octaves = 3,
-	persist = 0.5
+	octaves = 4,
+	persist = 0.6
 }
 
 local np_pathb = {
-	offset = 0,
+	offset = 0.0,
 	scale = 1,
-	spread = {x = 256, y = 256, z = 256},
+	spread = {x = 384, y = 384, z = 384},
 	seed = 303,
-	octaves = 3,
+	octaves = 1,
+	persist = 0.5
+}
+
+-- Noises blended to create 'path2'
+
+local np_pathc = {
+	offset = 0.0,
+	scale = 1,
+	spread = {x = 512, y = 512, z = 512},
+	seed = 7755,
+	octaves = 4,
+	persist = 0.6
+}
+
+local np_pathd = {
+	offset = 0.0,
+	scale = 1,
+	spread = {x = 512, y = 512, z = 512},
+	seed = 1001,
+	octaves = 1,
+	persist = 0.5
+}
+
+-- Blend between low and high octave noises
+
+local np_blend = {
+	offset = 0.0,
+	scale = 6.0,
+	spread = {x = 256, y = 256, z = 256},
+	seed = 95059,
+	octaves = 1,
 	persist = 0.5
 }
 
@@ -39,36 +72,12 @@ minetest.register_node("track:road_white", {
 	groups = {cracky = 3},
 })
 
-minetest.register_node("track:arrow_left", {
-	description = "Arrow Block Left",
-	tiles = {"track_red.png", "track_red.png",
-		"track_arrow_left.png", "track_red.png",
-		"track_red.png", "track_arrow_left.png"},
-	paramtype = "light",
-	light_source = 14,
-	paramtype2 = "facedir",
-	groups = {dig_immediate = 2},
-})
 
-minetest.register_node("track:arrow_right", {
-	description = "Arrow Block Right",
-	tiles = {"track_red.png", "track_red.png",
-		"track_arrow_left.png^[transformFX", "track_red.png",
-		"track_red.png", "track_arrow_left.png^[transformFX"},
-	paramtype = "light",
-	light_source = 14,
-	paramtype2 = "facedir",
-	groups = {dig_immediate = 2},
-})
+-- Set mapgen flags to disable core mapgen decoration placement.
+-- Tree decorations are placed using the Lua Voxel Manipulator after track generation
+-- to avoid trees on track.
 
-
--- Give initial items
-
-minetest.register_on_newplayer(function(player)
-	local inv = player:get_inventory()
-	inv:add_item("main", "track:arrow_left 512")
-	inv:add_item("main", "track:arrow_right 512")
-end)
+minetest.set_mapgen_setting("mg_flags", "caves,dungeons,light,nodecorations,biomes", true)
 
 
 -- Constants
@@ -81,8 +90,14 @@ local c_roadwhite = minetest.get_content_id("track:road_white")
 
 local nobj_patha = nil
 local nobj_pathb = nil
+local nobj_pathc = nil
+local nobj_pathd = nil
+local nobj_blend = nil
 local nvals_patha = {}
 local nvals_pathb = {}
+local nvals_pathc = {}
+local nvals_pathd = {}
+local nvals_blend = {}
 local data = {}
 
 
@@ -112,8 +127,14 @@ minetest.register_on_generated(function(minp, maxp, seed)
 
 	nobj_patha = nobj_patha or minetest.get_perlin_map(np_patha, pmapdims)
 	nobj_pathb = nobj_pathb or minetest.get_perlin_map(np_pathb, pmapdims)
+	nobj_pathc = nobj_pathc or minetest.get_perlin_map(np_pathc, pmapdims)
+	nobj_pathd = nobj_pathd or minetest.get_perlin_map(np_pathd, pmapdims)
+	nobj_blend = nobj_blend or minetest.get_perlin_map(np_blend, pmapdims)
 	nobj_patha:get2dMap_flat(pmapminp, nvals_patha)
 	nobj_pathb:get2dMap_flat(pmapminp, nvals_pathb)
+	nobj_pathc:get2dMap_flat(pmapminp, nvals_pathc)
+	nobj_pathd:get2dMap_flat(pmapminp, nvals_pathd)
+	nobj_blend:get2dMap_flat(pmapminp, nvals_blend)
 
 	local vm, emin, emax = minetest.get_mapgen_object("voxelmanip")
 	local area = VoxelArea:new{MinEdge = emin, MaxEdge = emax}
@@ -121,28 +142,33 @@ minetest.register_on_generated(function(minp, maxp, seed)
 
 	-- Track brush centre generation area extends from x0/z0 - 4 to x1/z1 + 4
 	for z = z0 - 4, z1 + 4 do
-		-- Initial noise index at x0 - 4 for this z
+		-- Initial noise index at x0 - 4
 		local ni = 1 + (z - (z0 - 5)) * pmapdim + 1
-		local n_xprepatha = nvals_patha[(ni - 1)]
-		local n_xprepathb = nvals_pathb[(ni - 1)]
+		-- Initial blend, n_path and n_path2 values for adjacent node at x0 - 5
+		local xpreblend = (math.tanh(nvals_blend[(ni - 1)]) + 1) / 2
+		local n_xprepath = (1 - xpreblend) * nvals_patha[(ni - 1)] +
+			xpreblend * nvals_pathb[(ni - 1)]
+		local n_xprepath2 = (1 - xpreblend) * nvals_pathc[(ni - 1)] +
+			xpreblend * nvals_pathd[(ni - 1)]
 		for x = x0 - 4, x1 + 4 do
-			local n_patha = nvals_patha[ni]
-			local n_pathb = nvals_pathb[ni]
-			local n_zprepatha = nvals_patha[(ni - pmapdim)]
-			local n_zprepathb = nvals_pathb[(ni - pmapdim)]
-			-- Detect sign change of noise
-			if (n_patha >= 0 and n_xprepatha < 0)
-					or (n_patha < 0 and n_xprepatha >= 0)
-					or (n_patha >= 0 and n_zprepatha < 0)
-					or (n_patha < 0 and n_zprepatha >= 0)
-
-					or (n_pathb >= 0 and n_xprepathb < 0)
-					or (n_pathb < 0 and n_xprepathb >= 0)
-					or (n_pathb >= 0 and n_zprepathb < 0)
-					or (n_pathb < 0 and n_zprepathb >= 0)
-					-- Smooth corners of junctions
-					or math.pow(math.abs(n_patha), 0.1) *
-					math.pow(math.abs(n_pathb), 0.1) < 0.5 then
+			local blend = (math.tanh(nvals_blend[ni]) + 1) / 2
+			local n_path = (1 - blend) * nvals_patha[ni] + blend * nvals_pathb[ni]
+			local n_path2 = (1 - blend) * nvals_pathc[ni] + blend * nvals_pathd[ni]
+			-- blend, n_path and n_path2 values for adjacent node at z - 1
+			local zpreblend = (math.tanh(nvals_blend[(ni - pmapdim)]) + 1) / 2
+			local n_zprepath = (1 - zpreblend) * nvals_patha[(ni - pmapdim)] +
+				zpreblend * nvals_pathb[(ni - pmapdim)]
+			local n_zprepath2 = (1 - zpreblend) * nvals_pathc[(ni - pmapdim)] +
+				zpreblend * nvals_pathd[(ni - pmapdim)]
+			-- Detect sign change of n_path and n_path2 in x, z directions
+			if (n_path * n_xprepath < 0)
+					or (n_path * n_zprepath < 0)
+					or (n_path2 * n_xprepath2 < 0)
+					or (n_path2 * n_zprepath2 < 0)
+					-- Detect when n_path and n_path2 are simultaneously
+					-- very small, to smooth corners of junctions
+					or math.pow(math.abs(n_path), 0.1) *
+					math.pow(math.abs(n_path2), 0.1) < 0.5 then
 				-- Place track brush of radius 4
 				for k = -4, 4 do
 					local vi = area:index(x - 4, pathy, z + k)
@@ -162,8 +188,9 @@ minetest.register_on_generated(function(minp, maxp, seed)
 			end
 
 			ni = ni + 1
-			n_xprepatha = n_patha
-			n_xprepathb = n_pathb
+			-- Set adjacent node values to current values
+			n_xprepath = n_path
+			n_xprepath2 = n_path2
 		end
 	end
 	
